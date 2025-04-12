@@ -5,12 +5,13 @@ import uuid
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from PIL import Image
+from tqdm import tqdm
 import torch
 from transformers import CLIPProcessor, CLIPModel
 import faiss
 from io import BytesIO
+from fastapi.staticfiles import StaticFiles
 
-app = FastAPI()
 
 # Настройка модели CLIP
 device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -42,7 +43,7 @@ def build_index_from_folder():
     product_id_map.clear()
     products.clear()
 
-    for product_id in os.listdir(DATA_DIR):
+    for product_id in tqdm(os.listdir(DATA_DIR)):
         product_dir = os.path.join(DATA_DIR, product_id)
         if not os.path.isdir(product_dir):
             continue
@@ -57,6 +58,10 @@ def build_index_from_folder():
                 products[product_id].append(image_path)
             except Exception as e:
                 print(f"Ошибка при обработке {image_path}: {e}")
+
+
+app = FastAPI()
+app.mount("/static", StaticFiles(directory=DATA_DIR), name="static")
 
 
 @app.on_event("startup")
@@ -133,5 +138,20 @@ async def search(file: UploadFile = File(...), k: int = 5):
         raise HTTPException(status_code=400, detail="Index is empty")
 
     distances, indices = index.search(query_embedding, k)
-    results = [product_id_map[i] for i in indices[0]]
+
+    seen = set()
+    results = []
+    for i in indices[0]:
+        product_id = product_id_map[i]
+        if product_id in seen:
+            continue
+        seen.add(product_id)
+
+        photo_paths = products.get(product_id, [])
+        # возвращаем относительные пути, чтобы стримлит мог запросить через /static
+        relative_paths = [
+            os.path.relpath(p, DATA_DIR).replace("\\", "/") for p in photo_paths
+        ]
+        results.append({"product_id": product_id, "photos": relative_paths})
+
     return {"matches": results}
