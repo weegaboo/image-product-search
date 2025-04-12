@@ -24,6 +24,7 @@ os.makedirs(DATA_DIR, exist_ok=True)
 
 products = {}  # product_id: List[image_paths]
 product_id_map = []  # Индексы в FAISS -> product_id
+reverse_photo_map = []
 index = faiss.IndexFlatL2(512)  # FAISS index
 
 
@@ -54,6 +55,7 @@ def build_index_from_folder():
                 image = Image.open(image_path).convert("RGB")
                 embedding = embed_image(image)
                 index.add(embedding)
+                reverse_photo_map.append(image_path)
                 product_id_map.append(product_id)
                 products[product_id].append(image_path)
             except Exception as e:
@@ -96,6 +98,7 @@ async def add_image(product_id: str, file: UploadFile = File(...)):
     image = Image.open(image_path).convert("RGB")
     embedding = embed_image(image)
     index.add(embedding)
+    reverse_photo_map.append(image_path)
     product_id_map.append(product_id)
     products[product_id].append(image_path)
 
@@ -128,6 +131,8 @@ def delete_product(product_id: str):
 
 
 # Ручка: поиск топ-k похожих товаров
+from collections import defaultdict
+
 @app.post("/search/")
 async def search(file: UploadFile = File(...), k: int = 5):
     contents = await file.read()
@@ -137,21 +142,26 @@ async def search(file: UploadFile = File(...), k: int = 5):
     if index.ntotal == 0:
         raise HTTPException(status_code=400, detail="Index is empty")
 
-    distances, indices = index.search(query_embedding, k)
+    distances, indices = index.search(query_embedding, k)  # искать больше, чем k
 
-    seen = set()
-    results = []
-    for i in indices[0]:
-        product_id = product_id_map[i]
-        if product_id in seen:
-            continue
-        seen.add(product_id)
+    # сгруппируем по product_id
+    grouped = defaultdict(list)
 
-        photo_paths = products.get(product_id, [])
-        # возвращаем относительные пути, чтобы стримлит мог запросить через /static
-        relative_paths = [
-            os.path.relpath(p, DATA_DIR).replace("\\", "/") for p in photo_paths
-        ]
-        results.append({"product_id": product_id, "photos": relative_paths})
+    for dist, idx in zip(distances[0], indices[0]):
+        product_id = product_id_map[idx]
+        photo_path = reverse_photo_map[idx]  # тебе нужно создать этот список при index.add()
+        grouped[product_id].append((dist, photo_path))
 
-    return {"matches": results}
+    # сортируем по минимальной дистанции к каждому товару
+    ranked_products = sorted(grouped.items(), key=lambda x: min(d[0] for d in x[1]))
+
+    # отбираем top-k товаров
+    result = []
+    for product_id, items in ranked_products[:k]:
+        sorted_photos = sorted(items, key=lambda x: x[0])  # по расстоянию
+        result.append({
+            "product_id": product_id,
+            "photos": [p.replace(DATA_DIR, "") for _, p in sorted_photos]  # до 5 самых близких фоток
+        })
+
+    return {"matches": result}
