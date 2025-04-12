@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  api:
+    build:
+      dockerfile: search/Dockerfile
+    container_name: image-product-api
+    volumes:
+      - ./products:/app/products
+    ports:
+      - "8000:8000"
+
+  ui:
+    build:
+      dockerfile: ui/Dockerfile
+    container_name: image-product-ui
+    depends_on:
+      - api
+    volumes:
+      - ./products:/app/products
+    environment:
+      - API_URL=http://api:8000
+    ports:
+      - "8501:8501"
