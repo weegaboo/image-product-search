@@ -1,63 +1,159 @@
-import os
-
 import streamlit as st
 import requests
 from PIL import Image
 from io import BytesIO
+import os
 
-API_URL = os.getenv("API_URL", "http://api:8000")
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 st.set_page_config(page_title="Product Matcher", layout="wide")
-st.title("Product Matcher UI")
+st.title("🧠 Image Product Matcher")
 
-tab1, tab2 = st.tabs(["🔍 Поиск по фото", "➕ Добавить фото к товару"])
+# TAB layout
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🔍 Поиск",
+    "➕ Добавить фото",
+    "➕ Новый товар",
+    "❌ Удалить"
+])
 
-# === TAB 1: ПОИСК ===
+# -------------------------------
+# TAB 1 — ПОИСК
+# -------------------------------
 with tab1:
-    st.header("Поиск похожих товаров по изображению")
-    search_file = st.file_uploader(
-        "Загрузите изображение для поиска", type=["jpg", "jpeg", "png"]
-    )
-    k = st.slider("Количество результатов", 1, 10, 5)
+    st.header("🔍 Найти похожие товары по изображению")
+    search_file = st.file_uploader("Загрузите изображение", type=["jpg", "jpeg", "png"])
+    k = st.slider("Сколько результатов показать", 1, 10, 5)
 
-    if st.button("Найти похожие товары") and search_file:
-        files = {"file": (search_file.name, search_file.read(), search_file.type)}
+    if search_file and st.button("Найти"):
+        uploaded_bytes = search_file.read()
+
+        st.subheader("🔎 Вы загрузили:")
+        st.image(Image.open(BytesIO(uploaded_bytes)), caption="Запрос", width=300)
+
+        files = {"file": (search_file.name, uploaded_bytes, search_file.type)}
         response = requests.post(f"{API_URL}/search/", files=files, params={"k": k})
 
         if response.status_code == 200:
-            result = response.json()
-            print(result)
-            matches = result.get("matches", [])
-            st.subheader("Результаты:")
+            results = response.json().get("matches", [])
 
-            cols = st.columns(3)
-            for i, match in enumerate(matches):
-                product_id = match["product_id"]
-                photos = match.get("photos", [])
-                with cols[i % 3]:
-                    st.markdown(f"**Product ID:** `{product_id}`")
-                    for path in photos:
-                        image_response = requests.get(f"{API_URL}/static/{path}")
-                        if image_response.status_code == 200:
-                            img = Image.open(BytesIO(image_response.content))
-                            st.image(img, use_column_width=True)
+            if not results:
+                st.warning("Ничего не найдено.")
+            else:
+                st.subheader("🎯 Найденные товары:")
+
+                # Стилизация карточек
+                # Стилизация карточек
+                st.markdown("""
+                    <style>
+                    .product-gallery {
+                        display: flex;
+                        overflow-x: auto;
+                        gap: 24px;
+                        padding: 1em 0;
+                    }
+                    .product-card {
+                        flex: 0 0 auto;
+                        padding: 10px;
+                        border-radius: 8px;
+                        border: 1px solid #ddd;
+                        background: #fafafa;
+                        text-align: center;
+                        width: 240px;
+                    }
+                    .product-card h4 {
+                        margin-bottom: 0.5em;
+                        font-size: 16px;
+                        color: #333;
+                    }
+                    .product-card img {
+                        max-width: 100%;
+                        max-height: 150px;
+                        margin-bottom: 6px;
+                        border-radius: 4px;
+                        object-fit: contain;
+                    }
+                    </style>
+                """, unsafe_allow_html=True)
+
+                # Сборка всех карточек в одну строку
+                gallery_html = '<div class="product-gallery">'
+
+                for match in results:
+                    product_id = match["product_id"]
+                    photos = match.get("photos", [])
+
+                    gallery_html += f'<div class="product-card"><h4>{product_id}</h4>'
+                    for photo_path in photos[:3]:
+                        full_url = f"{API_URL}/static/{photo_path}"
+                        gallery_html += f'<img src="{full_url}" alt="{product_id}">'
+                    gallery_html += '</div>'
+
+                gallery_html += '</div>'
+
+                # Отображаем галерею
+                st.markdown(gallery_html, unsafe_allow_html=True)
         else:
             st.error(f"Ошибка: {response.status_code} — {response.text}")
 
 
-# === TAB 2: ДОБАВИТЬ ФОТО ===
+# -------------------------------
+# TAB 2 — ДОБАВИТЬ ФОТО
+# -------------------------------
 with tab2:
-    st.header("Добавить изображение к товару")
-    product_id = st.text_input("ID товара")
-    new_photo = st.file_uploader(
-        "Выберите изображение", type=["jpg", "jpeg", "png"], key="upload"
-    )
+    st.header("➕ Добавить изображение к товару")
+    add_photo_product_id = st.text_input("ID товара", key="add_photo_pid")
+    add_photo_file = st.file_uploader("Выберите изображение", type=["jpg", "jpeg", "png"], key="add_photo_file")
 
-    if st.button("Добавить фото") and product_id and new_photo:
-        files = {"file": (new_photo.name, new_photo.read(), new_photo.type)}
-        response = requests.post(f"{API_URL}/add_image/{product_id}", files=files)
-
-        if response.status_code == 200:
+    if st.button("Добавить изображение") and add_photo_file and add_photo_product_id:
+        files = {"file": (add_photo_file.name, add_photo_file.read(), add_photo_file.type)}
+        resp = requests.post(f"{API_URL}/add_image/{add_photo_product_id}", files=files)
+        if resp.status_code == 200:
             st.success("Фото успешно добавлено")
         else:
-            st.error(f"Ошибка: {response.status_code} — {response.text}")
+            st.error(f"Ошибка: {resp.status_code} — {resp.text}")
+
+
+# -------------------------------
+# TAB 3 — ДОБАВИТЬ ТОВАР
+# -------------------------------
+with tab3:
+    st.header("➕ Создать новый товар")
+    if st.button("Создать"):
+        resp = requests.post(f"{API_URL}/add_product/")
+        if resp.status_code == 200:
+            new_id = resp.json().get("product_id")
+            st.success(f"Новый товар создан: `{new_id}`")
+        else:
+            st.error(f"Ошибка: {resp.status_code} — {resp.text}")
+
+
+# -------------------------------
+# TAB 4 — УДАЛЕНИЕ
+# -------------------------------
+with tab4:
+    st.header("❌ Удалить")
+
+    st.markdown("##### Удалить изображение у товара")
+    del_photo_pid = st.text_input("ID товара", key="del_img_pid")
+    del_photo_filename = st.text_input("Имя файла", key="del_img_filename")
+
+    if st.button("Удалить изображение"):
+        resp = requests.delete(
+            f"{API_URL}/delete_image/{del_photo_pid}",
+            params={"filename": del_photo_filename}
+        )
+        if resp.status_code == 200:
+            st.success("Изображение удалено")
+        else:
+            st.error(f"Ошибка: {resp.status_code} — {resp.text}")
+
+    st.markdown("##### Удалить товар полностью")
+    del_product_id = st.text_input("ID товара", key="del_product")
+
+    if st.button("Удалить товар"):
+        resp = requests.delete(f"{API_URL}/delete_product/{del_product_id}")
+        if resp.status_code == 200:
+            st.success("Товар удалён")
+        else:
+            st.error(f"Ошибка: {resp.status_code} — {resp.text}")
