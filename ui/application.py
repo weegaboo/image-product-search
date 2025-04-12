@@ -15,7 +15,9 @@ tab1, tab2 = st.tabs(["🔍 Поиск по фото", "➕ Добавить ф�
 # === TAB 1: ПОИСК ===
 with tab1:
     st.header("Поиск похожих товаров по изображению")
-    search_file = st.file_uploader("Загрузите изображение для поиска", type=["jpg", "jpeg", "png"])
+    search_file = st.file_uploader(
+        "Загрузите изображение для поиска", type=["jpg", "jpeg", "png"]
+    )
     k = st.slider("Количество результатов", 1, 10, 5)
 
     if st.button("Найти похожие товары") and search_file:
@@ -47,7 +49,9 @@ with tab1:
 with tab2:
     st.header("Добавить изображение к товару")
     product_id = st.text_input("ID товара")
-    new_photo = st.file_uploader("Выберите изображение", type=["jpg", "jpeg", "png"], key="upload")
+    new_photo = st.file_uploader(
+        "Выберите изображение", type=["jpg", "jpeg", "png"], key="upload"
+    )
 
     if st.button("Добавить фото") and product_id and new_photo:
         files = {"file": (new_photo.name, new_photo.read(), new_photo.type)}
