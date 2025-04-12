@@ -8,6 +8,7 @@ from PIL import Image
 import torch
 from transformers import CLIPProcessor, CLIPModel
 import faiss
+from io import BytesIO
 
 app = FastAPI()
 
@@ -17,7 +18,7 @@ clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 # Хранилища
-DATA_DIR = "./product_images"
+DATA_DIR = "./products"
 os.makedirs(DATA_DIR, exist_ok=True)
 
 products = {}  # product_id: List[image_paths]
@@ -124,7 +125,8 @@ def delete_product(product_id: str):
 # Ручка: поиск топ-k похожих товаров
 @app.post("/search/")
 async def search(file: UploadFile = File(...), k: int = 5):
-    image = Image.open(await file.read()).convert("RGB")
+    contents = await file.read()
+    image = Image.open(BytesIO(contents)).convert("RGB")
     query_embedding = embed_image(image)
 
     if index.ntotal == 0:
