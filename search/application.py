@@ -11,6 +11,7 @@ from transformers import CLIPProcessor, CLIPModel
 import faiss
 from io import BytesIO
 from fastapi.staticfiles import StaticFiles
+from collections import defaultdict
 
 
 # Настройка модели CLIP
@@ -130,9 +131,6 @@ def delete_product(product_id: str):
     return {"message": "Product deleted"}
 
 
-# Ручка: поиск топ-k похожих товаров
-from collections import defaultdict
-
 @app.post("/search/")
 async def search(file: UploadFile = File(...), k: int = 5):
     contents = await file.read()
@@ -149,7 +147,9 @@ async def search(file: UploadFile = File(...), k: int = 5):
 
     for dist, idx in zip(distances[0], indices[0]):
         product_id = product_id_map[idx]
-        photo_path = reverse_photo_map[idx]  # тебе нужно создать этот список при index.add()
+        photo_path = reverse_photo_map[
+            idx
+        ]  # тебе нужно создать этот список при index.add()
         grouped[product_id].append((dist, photo_path))
 
     # сортируем по минимальной дистанции к каждому товару
@@ -159,9 +159,13 @@ async def search(file: UploadFile = File(...), k: int = 5):
     result = []
     for product_id, items in ranked_products[:k]:
         sorted_photos = sorted(items, key=lambda x: x[0])  # по расстоянию
-        result.append({
-            "product_id": product_id,
-            "photos": [p.replace(DATA_DIR, "") for _, p in sorted_photos]  # до 5 самых близких фоток
-        })
+        result.append(
+            {
+                "product_id": product_id,
+                "photos": [
+                    p.replace(DATA_DIR, "") for _, p in sorted_photos
+                ],  # до 5 самых близких фоток
+            }
+        )
 
     return {"matches": result}

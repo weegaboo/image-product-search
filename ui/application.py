@@ -10,12 +10,9 @@ st.set_page_config(page_title="Product Matcher", layout="wide")
 st.title("🧠 Image Product Matcher")
 
 # TAB layout
-tab1, tab2, tab3, tab4 = st.tabs([
-    "🔍 Поиск",
-    "➕ Добавить фото",
-    "➕ Новый товар",
-    "❌ Удалить"
-])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["🔍 Поиск", "➕ Добавить фото", "➕ Новый товар", "❌ Удалить"]
+)
 
 # -------------------------------
 # TAB 1 — ПОИСК
@@ -44,7 +41,8 @@ with tab1:
 
                 # Стилизация карточек
                 # Стилизация карточек
-                st.markdown("""
+                st.markdown(
+                    """
                     <style>
                     .product-gallery {
                         display: flex;
@@ -74,7 +72,9 @@ with tab1:
                         object-fit: contain;
                     }
                     </style>
-                """, unsafe_allow_html=True)
+                """,
+                    unsafe_allow_html=True,
+                )
 
                 # Сборка всех карточек в одну строку
                 gallery_html = '<div class="product-gallery">'
@@ -87,9 +87,9 @@ with tab1:
                     for photo_path in photos[:3]:
                         full_url = f"{API_URL}/static/{photo_path}"
                         gallery_html += f'<img src="{full_url}" alt="{product_id}">'
-                    gallery_html += '</div>'
+                    gallery_html += "</div>"
 
-                gallery_html += '</div>'
+                gallery_html += "</div>"
 
                 # Отображаем галерею
                 st.markdown(gallery_html, unsafe_allow_html=True)
@@ -103,10 +103,14 @@ with tab1:
 with tab2:
     st.header("➕ Добавить изображение к товару")
     add_photo_product_id = st.text_input("ID товара", key="add_photo_pid")
-    add_photo_file = st.file_uploader("Выберите изображение", type=["jpg", "jpeg", "png"], key="add_photo_file")
+    add_photo_file = st.file_uploader(
+        "Выберите изображение", type=["jpg", "jpeg", "png"], key="add_photo_file"
+    )
 
     if st.button("Добавить изображение") and add_photo_file and add_photo_product_id:
-        files = {"file": (add_photo_file.name, add_photo_file.read(), add_photo_file.type)}
+        files = {
+            "file": (add_photo_file.name, add_photo_file.read(), add_photo_file.type)
+        }
         resp = requests.post(f"{API_URL}/add_image/{add_photo_product_id}", files=files)
         if resp.status_code == 200:
             st.success("Фото успешно добавлено")
@@ -141,7 +145,7 @@ with tab4:
     if st.button("Удалить изображение"):
         resp = requests.delete(
             f"{API_URL}/delete_image/{del_photo_pid}",
-            params={"filename": del_photo_filename}
+            params={"filename": del_photo_filename},
         )
         if resp.status_code == 200:
             st.success("Изображение удалено")
