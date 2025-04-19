@@ -12,6 +12,7 @@ import faiss
 from io import BytesIO
 from fastapi.staticfiles import StaticFiles
 from collections import defaultdict
+from pathlib import Path
 
 
 # Настройка модели CLIP
@@ -163,7 +164,7 @@ async def search(file: UploadFile = File(...), k: int = 5):
             {
                 "product_id": product_id,
                 "photos": [
-                    p.replace(DATA_DIR, "") for _, p in sorted_photos
+                    str(Path(p.replace(f"{DATA_DIR}/", ""))) for _, p in sorted_photos
                 ],  # до 5 самых близких фоток
             }
         )
