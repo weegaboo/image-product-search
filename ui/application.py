@@ -3,6 +3,7 @@ import requests
 from PIL import Image
 from io import BytesIO
 import os
+from urllib.parse import quote
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
@@ -83,16 +84,22 @@ with tab1:
                     product_id = match["product_id"]
                     photos = match.get("photos", [])
 
-                    gallery_html += f'<div class="product-card"><h4>{product_id}</h4>'
-                    for photo_path in photos[:3]:
-                        full_url = f"{API_URL}/static/{photo_path}"
-                        gallery_html += f'<img src="{full_url}" alt="{product_id}">'
-                    gallery_html += "</div>"
+                    st.markdown(f"### 🧾 Product ID: `{product_id}`")
 
-                gallery_html += "</div>"
-
-                # Отображаем галерею
-                st.markdown(gallery_html, unsafe_allow_html=True)
+                    cols = st.columns(min(3, len(photos)))
+                    for i, photo_path in enumerate(photos[:3]):
+                        try:
+                            safe_path = quote(photo_path)
+                            url = f"{API_URL}/static/{safe_path}"
+                            response = requests.get(url)
+                            if response.status_code == 200:
+                                img = Image.open(BytesIO(response.content))
+                                with cols[i]:
+                                    st.image(img, caption=photo_path.split("/")[-1], width=300)
+                            else:
+                                st.error(f"Ошибка загрузки {url} ({response.status_code})")
+                        except Exception as e:
+                            st.error(f"Ошибка: {e}")
         else:
             st.error(f"Ошибка: {response.status_code} — {response.text}")
 
