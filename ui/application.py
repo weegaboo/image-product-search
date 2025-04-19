@@ -95,9 +95,15 @@ with tab1:
                             if response.status_code == 200:
                                 img = Image.open(BytesIO(response.content))
                                 with cols[i]:
-                                    st.image(img, caption=photo_path.split("/")[-1], width=300)
+                                    st.image(
+                                        img,
+                                        caption=photo_path.split("/")[-1],
+                                        width=300,
+                                    )
                             else:
-                                st.error(f"Ошибка загрузки {url} ({response.status_code})")
+                                st.error(
+                                    f"Ошибка загрузки {url} ({response.status_code})"
+                                )
                         except Exception as e:
                             st.error(f"Ошибка: {e}")
         else:
