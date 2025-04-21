@@ -18,9 +18,7 @@ from qdrant_client.http import models as qdrant
 
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 model, _, preprocess = open_clip.create_model_and_transforms(
-    model_name="ViT-H-14",
-    pretrained="laion2b_s32b_b79k",
-    device=DEVICE
+    model_name="ViT-H-14", pretrained="laion2b_s32b_b79k", device=DEVICE
 )
 model.eval()
 
@@ -31,12 +29,13 @@ products: dict[str, list[str]] = {}  # product_id -> [image_path, …]
 
 
 VECTOR_SIZE = 1024
-COLLECTION  = "products_clip"
+COLLECTION = "products_clip"
 client = QdrantClient(  # если контейнер крутится на других хосте/порте, поправьте
     host="localhost",
     port=6333,
-    prefer_grpc=True,   # быстрее
+    prefer_grpc=True,  # быстрее
 )
+
 
 def ensure_collection():
     if COLLECTION in {c.name for c in client.get_collections().collections}:
@@ -49,6 +48,7 @@ def ensure_collection():
         ),
     )
 
+
 ensure_collection()
 
 
@@ -59,12 +59,14 @@ def embed_image(image: Image.Image) -> np.ndarray:
     tensor = preprocess(image).unsqueeze(0).to(DEVICE)
     with torch.no_grad(), torch.cuda.amp.autocast(DEVICE == "cuda"):
         emb = model.encode_image(tensor)
-    emb = emb / emb.norm(dim=-1, keepdim=True) # L2
+    emb = emb / emb.norm(dim=-1, keepdim=True)  # L2
     return emb.cpu().numpy().astype("float32")
+
 
 def point_id() -> str:
     # Qdrant может принимать int или str. Берём str‑uuid для простоты.
     return str(uuid.uuid4())
+
 
 def build_index_from_folder():
     """
@@ -89,7 +91,7 @@ def build_index_from_folder():
             img_path = os.path.join(product_dir, img_file)
             try:
                 image = Image.open(img_path).convert("RGB")
-                vec = embed_image(image)[0]          # (1024,)
+                vec = embed_image(image)[0]  # (1024,)
                 pid = point_id()
 
                 batch_vectors.append(vec)
@@ -125,12 +127,15 @@ def build_index_from_folder():
             ],
         )
 
+
 app = FastAPI()
 app.mount("/static", StaticFiles(directory=DATA_DIR), name="static")
+
 
 @app.on_event("startup")
 def _startup():
     build_index_from_folder()
+
 
 @app.post("/add_product/")
 def add_product():
@@ -138,6 +143,7 @@ def add_product():
     os.makedirs(os.path.join(DATA_DIR, product_id), exist_ok=True)
     products[product_id] = []
     return {"product_id": product_id}
+
 
 @app.post("/add_image/{product_id}")
 async def add_image(product_id: str, file: UploadFile = File(...)):
@@ -172,6 +178,7 @@ async def add_image(product_id: str, file: UploadFile = File(...)):
     products[product_id].append(img_path)
     return {"message": "Image added", "path": img_path}
 
+
 @app.delete("/delete_image/{product_id}")
 def delete_image(product_id: str, filename: str):
     """
@@ -189,6 +196,7 @@ def delete_image(product_id: str, filename: str):
     build_index_from_folder()
     return {"message": "Image deleted"}
 
+
 @app.delete("/delete_product/{product_id}")
 def delete_product(product_id: str):
     if product_id not in products:
@@ -196,6 +204,7 @@ def delete_product(product_id: str):
     shutil.rmtree(os.path.join(DATA_DIR, product_id))
     build_index_from_folder()
     return {"message": "Product deleted"}
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # 6.2  Поиск ближайших товаров
@@ -208,11 +217,7 @@ async def search(file: UploadFile = File(...), k: int = 5):
 
     # ищем с запасом, чтобы потом сгруппировать по product_id
     limit = k * 10
-    hits = client.query_points(
-        COLLECTION,
-        query=query_vec,
-        limit=limit
-    )
+    hits = client.query_points(COLLECTION, query=query_vec, limit=limit)
 
     if not hits:
         raise HTTPException(400, "Index is empty")
@@ -225,7 +230,9 @@ async def search(file: UploadFile = File(...), k: int = 5):
         grouped[pid].append((dist, img))
 
     # сортируем товары по максимальной близости (‑score↓)
-    ranked = sorted(grouped.items(), key=lambda x: max(d for d, _ in x[1]), reverse=True)
+    ranked = sorted(
+        grouped.items(), key=lambda x: max(d for d, _ in x[1]), reverse=True
+    )
 
     results = []
     for pid, items in ranked[:k]:
