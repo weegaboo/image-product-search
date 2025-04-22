@@ -31,8 +31,8 @@ products: dict[str, list[str]] = {}  # product_id -> [image_path, …]
 VECTOR_SIZE = 1024
 COLLECTION = "products_clip"
 client = QdrantClient(  # если контейнер крутится на других хосте/порте, поправьте
-    host="localhost",
-    port=6333,
+    host="qdrant",
+    port=6334,
     prefer_grpc=True,  # быстрее
 )
 
@@ -57,7 +57,7 @@ def embed_image(image: Image.Image) -> np.ndarray:
     Принимает PIL‑картинку, возвращает L2‑нормированный вектор float32 (1, 1024).
     """
     tensor = preprocess(image).unsqueeze(0).to(DEVICE)
-    with torch.no_grad(), torch.cuda.amp.autocast(DEVICE == "cuda"):
+    with torch.no_grad(), torch.amp.autocast("cuda"):
         emb = model.encode_image(tensor)
     emb = emb / emb.norm(dim=-1, keepdim=True)  # L2
     return emb.cpu().numpy().astype("float32")
