@@ -1,7 +1,7 @@
 services:
   api:
     build:
-      dockerfile: search/Dockerfile
+      dockerfile: qdrant_search/Dockerfile
     container_name: image-product-api
     volumes:
       - ./products:/app/products
